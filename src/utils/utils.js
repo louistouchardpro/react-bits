@@ -1,3 +1,6 @@
+const GITHUB_REPO_API_URL = 'https://api.github.com/repos/DavidHDev/react-bits';
+const STARS_REQUEST_TIMEOUT_MS = 4000;
+
 export const getLanguage = key => {
   const languages = {
     code: 'jsx',
@@ -20,18 +23,31 @@ const formatNumber = num => {
 };
 
 export const getStarsCount = async () => {
-  try {
-    const response = await fetch('https://api.github.com/repos/DavidHDev/react-bits');
-    const data = await response.json();
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), STARS_REQUEST_TIMEOUT_MS);
 
-    if (typeof data.stargazers_count !== 'number') {
+  try {
+    const response = await fetch(GITHUB_REPO_API_URL, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/vnd.github+json'
+      }
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    if (typeof data?.stargazers_count !== 'number') {
       return null;
     }
 
     return String(formatNumber(data.stargazers_count)).toUpperCase();
-  } catch (error) {
-    console.error('Error fetching stargazers count:', error);
+  } catch {
     return null;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 };
 
@@ -42,8 +58,11 @@ export const decodeLabel = label =>
     .join(' ');
 
 export const forceChakraDarkTheme = () => {
-  localStorage.setItem('chakra-ui-color-mode', 'dark');
-  console.info('Successfully set dark color mode.');
+  try {
+    localStorage.setItem('chakra-ui-color-mode', 'dark');
+  } catch {
+    // Ignore storage access failures and continue without forcing the theme.
+  }
 };
 
 export const randomHex = () =>
