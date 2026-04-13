@@ -3,14 +3,17 @@ import App from './App.jsx';
 import './styles.css';
 
 import { Provider } from './components/setup/provider';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { initializeAnalytics } from './utils/analytics';
 
-ReactDOM.createRoot(document.createElement('div')).render(
-  // eslint-disable-next-line react/no-children-prop
-  <SyntaxHighlighter language="" children={''} />
-);
+initializeAnalytics();
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+const rootElement = document.getElementById('root');
+
+if (!rootElement) {
+  throw new Error('Root element #root was not found.');
+}
+
+ReactDOM.createRoot(rootElement).render(
   <Provider>
     <App />
   </Provider>

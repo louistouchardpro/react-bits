@@ -1,61 +1,71 @@
-import { useState } from 'react';
-import { useSingleEffect } from 'react-haiku';
+import { useEffect, useState } from 'react';
 import { getStarsCount } from '../utils/utils';
 
 const CACHE_KEY = 'github_stars_cache';
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 const DEFAULT_STARS = 33200;
 
+const readCachedStars = () => {
+  try {
+    const cachedData = localStorage.getItem(CACHE_KEY);
+    if (!cachedData) {
+      return null;
+    }
+
+    const parsed = JSON.parse(cachedData);
+    if (!parsed || !parsed.count || parsed.count === 'NAN') {
+      return null;
+    }
+
+    return {
+      count: parsed.count,
+      isFresh: Date.now() - parsed.timestamp < CACHE_DURATION
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedStars = count => {
+  try {
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        count,
+        timestamp: Date.now()
+      })
+    );
+  } catch {
+    // Ignore storage write failures and keep the in-memory value.
+  }
+};
+
 export const useStars = () => {
-  const [stars, setStars] = useState(DEFAULT_STARS);
+  const [stars, setStars] = useState(() => readCachedStars()?.count || DEFAULT_STARS);
 
-  useSingleEffect(() => {
+  useEffect(() => {
+    const cached = readCachedStars();
+    if (cached?.isFresh) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
     const fetchStars = async () => {
-      try {
-        const cachedData = localStorage.getItem(CACHE_KEY);
-
-        if (cachedData) {
-          const { count, timestamp } = JSON.parse(cachedData);
-          const now = Date.now();
-
-          if (now - timestamp < CACHE_DURATION && count && count !== 'NAN') {
-            setStars(count);
-            return;
-          }
-        }
-
-        const count = await getStarsCount();
-
-        // Only update if we got a valid count
-        if (count && count !== 'NAN') {
-          localStorage.setItem(
-            CACHE_KEY,
-            JSON.stringify({
-              count,
-              timestamp: Date.now()
-            })
-          );
-
-          setStars(count);
-        }
-      } catch (error) {
-        console.error('Error fetching stars:', error);
-
-        const cachedData = localStorage.getItem(CACHE_KEY);
-        if (cachedData) {
-          const { count } = JSON.parse(cachedData);
-          if (count && count !== 'NAN') {
-            setStars(count);
-          } else {
-            setStars(DEFAULT_STARS);
-          }
-        } else {
-          setStars(DEFAULT_STARS);
-        }
+      const count = await getStarsCount();
+      if (!isMounted || !count || count === 'NAN') {
+        return;
       }
+
+      writeCachedStars(count);
+      setStars(count);
     };
 
     fetchStars();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return stars;
